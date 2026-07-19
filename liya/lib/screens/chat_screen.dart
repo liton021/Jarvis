@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:markdown/markdown.dart' as md;
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 
@@ -44,15 +47,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
     }
 
-    ref.read(chatProvider.notifier).addMessage(AppChatMessage(
-          id: _uuid.v4(),
-          text: 'How can I help you today?',
-          senderId: 'ai',
-          timestamp: DateTime.now(),
-          isUser: false,
-        ));
+    // Load chat history from storage
+    final history = await SecureStorageService.getChatHistory();
+    if (history.isNotEmpty) {
+      final messages = history.map((json) => AppChatMessage.fromJson(json)).toList();
+      for (final msg in messages) {
+        ref.read(chatProvider.notifier).addMessage(msg);
+      }
+    } else {
+      // First run - add welcome message
+      ref.read(chatProvider.notifier).addMessage(AppChatMessage(
+            id: _uuid.v4(),
+            text: 'How can I help you today?',
+            senderId: 'ai',
+            timestamp: DateTime.now(),
+            isUser: false,
+          ));
+    }
 
     setState(() => _isInitialized = true);
+  }
+
+  Future<void> _saveChatHistory() async {
+    final messages = ref.read(chatProvider).messages;
+    final history = messages.map((m) => m.toJson()).toList();
+    await SecureStorageService.saveChatHistory(history);
   }
 
   Future<void> _handleSend() async {
@@ -87,6 +106,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       isUser: true,
     );
     ref.read(chatProvider.notifier).addMessage(userMessage);
+    await _saveChatHistory();
 
     final aiMessageId = _uuid.v4();
     final aiMessage = AppChatMessage(
@@ -98,6 +118,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       isUser: false,
     );
     ref.read(chatProvider.notifier).addMessage(aiMessage);
+    await _saveChatHistory();
 
     setState(() => _isLoading = true);
     _scrollToBottom();
@@ -132,6 +153,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           isStreaming: false,
         );
       }
+      await _saveChatHistory();
     } catch (e) {
       ref.read(chatProvider.notifier).updateMessage(
         aiMessageId,
@@ -139,6 +161,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         isStreaming: false,
         metadata: {'isError': true},
       );
+      await _saveChatHistory();
     } finally {
       setState(() => _isLoading = false);
       _scrollToBottom();
@@ -191,6 +214,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         accumulatedText,
         isStreaming: false,
       );
+      await _saveChatHistory();
     } catch (e) {
       ref.read(chatProvider.notifier).updateMessage(
         messages[aiMessageIndex].id,
@@ -198,6 +222,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         isStreaming: false,
         metadata: {'isError': true},
       );
+      await _saveChatHistory();
     } finally {
       setState(() => _regeneratingMessageIndex = -1);
       _scrollToBottom();
@@ -253,6 +278,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           FilledButton(
             onPressed: () {
               ref.read(chatProvider.notifier).clearMessages();
+              SecureStorageService.saveChatHistory([]);
               Navigator.pop(context);
             },
             child: const Text('Clear'),
@@ -273,7 +299,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatProvider);
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     if (!_isInitialized) {
       return Scaffold(
@@ -298,8 +323,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             onPressed: () {
               final currentMode = ref.read(settingsProvider).themeMode;
               final newMode = currentMode == 'dark' ? 'light' : 'dark';
-              ref.read(settingsProvider.notifier).state =
-                  ref.read(settingsProvider).copyWith(themeMode: newMode);
+              ref.read(settingsProvider.notifier).state = ref.read(settingsProvider).copyWith(themeMode: newMode);
             },
             tooltip: theme.brightness == Brightness.dark ? 'Light mode' : 'Dark mode',
           ),
@@ -321,14 +345,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+              padding: const EdgeInsets.symmetric(vertical: 16),
               itemCount: chatState.messages.length,
               itemBuilder: (context, index) {
                 final message = chatState.messages[index];
                 final isUser = message.isUser;
                 final isRegenerating = _regeneratingMessageIndex == index;
 
-                return _buildMessage(message, index, theme, isRegenerating);
+                return _buildMessage(message, index, theme, isRegenerating, settings);
               },
             ),
           ),
@@ -340,14 +364,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildMessage(AppChatMessage message, int index, ThemeData theme, bool isRegenerating) {
+  Widget _buildMessage(AppChatMessage message, int index, ThemeData theme, bool isRegenerating, SettingsState settings) {
     final isUser = message.isUser;
     final isError = message.metadata?['isError'] == true;
     final isStreaming = message.isStreaming || isRegenerating;
     final timeStr = DateFormat('HH:mm').format(message.timestamp);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
@@ -401,16 +425,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ? null
                         : Border.all(color: theme.colorScheme.outline),
                   ),
-                  child: SelectableText(
-                    message.text,
-                    style: TextStyle(
-                      color: isUser
-                          ? theme.colorScheme.onPrimary
-                          : theme.colorScheme.onSurface,
-                      fontSize: 15,
-                      height: 1.5,
-                    ),
-                  ),
+                  child: settings.markdownEnabled && !isUser
+                      ? MarkdownBody(
+                          data: message.text,
+                          selectable: true,
+                          styleSheet: _buildMarkdownStyleSheet(theme, isError),
+                          onTapLink: (text, href, title) {
+                            if (href != null) {
+                              launchUrl(Uri.parse(href));
+                            }
+                          },
+                          extensionSet: md.ExtensionSet.gitHubFlavored,
+                        )
+                      : SelectableText(
+                          message.text,
+                          style: TextStyle(
+                            color: isUser
+                                ? theme.colorScheme.onPrimary
+                                : theme.colorScheme.onSurface,
+                            fontSize: 15,
+                            height: 1.5,
+                          ),
+                        ),
                 ),
                 if (!isStreaming && !isUser) ...[
                   const SizedBox(height: 8),
@@ -421,19 +457,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         icon: Icons.content_copy_outlined,
                         tooltip: 'Copy',
                         onPressed: () => _copyToClipboard(message.text),
-                        theme: theme,
+                        theme,
                       ),
                       _buildActionButton(
                         icon: Icons.refresh_outlined,
                         tooltip: 'Regenerate',
                         onPressed: () => _regenerateResponse(index),
-                        theme: theme,
+                        theme,
                       ),
                       _buildActionButton(
                         icon: Icons.share_outlined,
                         tooltip: 'Share',
                         onPressed: () => _shareResponse(message.text),
-                        theme: theme,
+                        theme,
                       ),
                     ],
                   ),
@@ -563,6 +599,55 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  MarkdownStyleSheet _buildMarkdownStyleSheet(ThemeData theme, bool isError) {
+    final baseColor = isError
+        ? theme.colorScheme.onErrorContainer
+        : theme.colorScheme.onSurface;
+
+    return MarkdownStyleSheet(
+      p: TextStyle(fontSize: 15, color: baseColor, height: 1.6),
+      h1: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: baseColor),
+      h2: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: baseColor),
+      h3: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: baseColor),
+      code: TextStyle(
+        fontSize: 14,
+        fontFamily: 'monospace',
+        color: theme.colorScheme.primary,
+        backgroundColor: theme.colorScheme.surfaceContainer,
+      ),
+      codeblockDecoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      codeblockPadding: const EdgeInsets.all(16),
+      blockquote: TextStyle(
+        fontSize: 15,
+        color: baseColor.withAlpha(180),
+        fontStyle: FontStyle.italic,
+      ),
+      blockquoteDecoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(8),
+        border: Border(
+          left: BorderSide(color: theme.colorScheme.primary, width: 4),
+        ),
+      ),
+      blockquotePadding: const EdgeInsets.all(12),
+      a: TextStyle(
+        color: theme.colorScheme.primary,
+        decoration: TextDecoration.underline,
+      ),
+      listBullet: TextStyle(fontSize: 15, color: baseColor),
+      listIndent: 24,
+      horizontalRuleDecoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant, width: 1),
         ),
       ),
     );

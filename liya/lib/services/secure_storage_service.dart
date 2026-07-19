@@ -20,6 +20,8 @@ class SecureStorageService {
   static const String _themeMode = 'theme_mode';
   static const String _showTimestamps = 'show_timestamps';
   static const String _customGeminiModels = 'custom_gemini_models';
+  static const String _chatHistory = 'chat_history';
+  static const String _chatSessions = 'chat_sessions';
 
   static Future<void> saveGeminiApiKey(String apiKey) async {
     await _storage.write(key: _geminiApiKey, value: apiKey);
@@ -64,7 +66,7 @@ class SecureStorageService {
 
   static Future<bool> getMarkdownEnabled() async {
     final value = await _storage.read(key: _markdownEnabled);
-    return value != 'false'; // default true
+    return value != 'false';
   }
 
   static Future<void> saveThemeMode(String mode) async {
@@ -106,5 +108,35 @@ class SecureStorageService {
 
   static Future<void> saveCustomGeminiModels(List<String> models) async {
     await _storage.write(key: _customGeminiModels, value: jsonEncode(models));
+  }
+
+  static Future<void> saveChatHistory(List<Map<String, dynamic>> messages) async {
+    await _storage.write(key: _chatHistory, value: jsonEncode(messages));
+  }
+
+  static Future<List<Map<String, dynamic>>> getChatHistory() async {
+    final json = await _storage.read(key: _chatHistory);
+    if (json == null || json.isEmpty) return [];
+    try {
+      final List<dynamic> decoded = jsonDecode(json);
+      return decoded.cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> saveChatSessions(List<Map<String, dynamic>> sessions) async {
+    await _storage.write(key: _chatSessions, value: jsonEncode(sessions));
+  }
+
+  static Future<List<Map<String, dynamic>>> getChatSessions() async {
+    final json = await _storage.read(key: _chatSessions);
+    if (json == null || json.isEmpty) return [];
+    try {
+      final List<dynamic> decoded = jsonDecode(json);
+      return decoded.cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
   }
 }
