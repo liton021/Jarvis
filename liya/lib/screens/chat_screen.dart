@@ -289,6 +289,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       appBar: AppBar(
         title: const Text('Liya'),
         actions: [
+          IconButton(
+            icon: Icon(
+              theme.brightness == Brightness.dark
+                  ? Icons.light_mode_outlined
+                  : Icons.dark_mode_outlined,
+            ),
+            onPressed: () {
+              final currentMode = ref.read(settingsProvider).themeMode;
+              final newMode = currentMode == 'dark' ? 'light' : 'dark';
+              ref.read(settingsProvider.notifier).state =
+                  ref.read(settingsProvider).copyWith(themeMode: newMode);
+            },
+            tooltip: theme.brightness == Brightness.dark ? 'Light mode' : 'Dark mode',
+          ),
           if (chatState.messages.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_sweep_outlined),
@@ -338,8 +352,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
-          if (!isUser) _buildAvatar(theme, isStreaming),
-          if (!isUser) const SizedBox(width: 12),
           Flexible(
             child: Column(
               crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -440,33 +452,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ],
             ),
           ),
-          if (isUser) const SizedBox(width: 12),
-          if (isUser) _buildUserAvatar(theme),
         ],
-      ),
-    );
-  }
-
-  Widget _buildAvatar(ThemeData theme, bool isStreaming) {
-    return CircleAvatar(
-      radius: 16,
-      backgroundColor: theme.colorScheme.surfaceContainerHighest,
-      child: Icon(
-        Icons.smart_toy_outlined,
-        size: 16,
-        color: theme.colorScheme.onSurfaceVariant,
-      ),
-    );
-  }
-
-  Widget _buildUserAvatar(ThemeData theme) {
-    return CircleAvatar(
-      radius: 16,
-      backgroundColor: theme.colorScheme.surfaceContainerHighest,
-      child: Icon(
-        Icons.person_outline,
-        size: 16,
-        color: theme.colorScheme.onSurfaceVariant,
       ),
     );
   }
