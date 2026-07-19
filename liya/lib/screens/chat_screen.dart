@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:markdown/markdown.dart' as md;
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 
@@ -412,19 +409,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         icon: Icons.content_copy_outlined,
                         tooltip: 'Copy',
                         onPressed: () => _copyToClipboard(message.text),
-                        theme,
+                        theme: theme,
                       ),
                       _buildActionButton(
                         icon: Icons.refresh_outlined,
                         tooltip: 'Regenerate',
                         onPressed: () => _regenerateResponse(index),
-                        theme,
+                        theme: theme,
                       ),
                       _buildActionButton(
                         icon: Icons.share_outlined,
                         tooltip: 'Share',
                         onPressed: () => _shareResponse(message.text),
-                        theme,
+                        theme: theme,
                       ),
                     ],
                   ),

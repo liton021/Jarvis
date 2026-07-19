@@ -131,6 +131,20 @@ Types: `feat`, `fix`, `refactor`, `style`, `docs`, `chore`, `release`
 - Feature branches: `feat/{name}`, `fix/{name}`
 - PR required for merging to main
 
+### 8. Auto-Install Missing Tools
+**If any required tool, SDK, or dependency is not installed:**
+- AI MUST install it automatically (e.g., Flutter SDK, Android SDK, build tools, npm packages, etc.)
+- No manual intervention required — handle setup programmatically
+- Verify installation works before proceeding
+
+### 9. Research Before Implementation
+**Before EVERY fix, feature addition, or architectural decision:**
+- Search online for current best practices, latest APIs, and known issues
+- Check official documentation, GitHub issues, Stack Overflow, and recent articles
+- Verify compatibility with current Flutter/Dart versions
+- Research alternatives and choose the most maintainable approach
+- Document findings in commit messages or code comments when relevant
+
 ## Current Version
 **v1.0.5+1** (as of 2026-07-19)
 
