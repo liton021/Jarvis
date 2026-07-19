@@ -55,7 +55,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final key = _apiKeyController.text.trim();
     await SecureStorageService.saveGeminiApiKey(key);
 
-    // Reinitialize the provider
     final provider = AIProviderRegistry.get('gemini');
     if (provider is GeminiProviderService) {
       final model = await SecureStorageService.getGeminiModel();
@@ -69,7 +68,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('API key saved successfully')),
+        const SnackBar(content: Text('API key saved')),
       );
     }
   }
@@ -100,7 +99,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await SecureStorageService.deleteGeminiApiKey();
       _apiKeyController.clear();
 
-      // Dispose the provider
       final provider = AIProviderRegistry.get('gemini');
       if (provider is GeminiProviderService) {
         await provider.dispose();
@@ -133,7 +131,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('API key is valid!'), backgroundColor: Colors.green),
+          SnackBar(
+            content: const Text('API key is valid'),
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
@@ -168,15 +169,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         final geminiProvider = AIProviderRegistry.get('gemini');
         if (geminiProvider is GeminiProviderService) {
-          // Save fetched models as custom models
           for (final model in models) {
             await geminiProvider.addCustomModel(model);
           }
         }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Fetched ${models.length} models successfully')),
+          SnackBar(content: Text('Fetched ${models.length} models')),
         );
-        setState(() {}); // Refresh to show new models
+        setState(() {});
       }
     } catch (e) {
       if (mounted) {
@@ -217,9 +217,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Added custom model: $model')),
+            SnackBar(content: Text('Added model: $model')),
           );
-          setState(() {}); // Refresh to show new model in list
+          setState(() {});
         }
       }
     } catch (e) {
@@ -238,7 +238,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (geminiProvider is GeminiProviderService) {
       await geminiProvider.removeCustomModel(model);
       if (mounted) {
-        setState(() {}); // Refresh to update list
+        setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Removed model: $model')),
         );
@@ -270,8 +270,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final provider = AIProviderRegistry.get('gemini')!;
+    final theme = Theme.of(context);
 
-    // Separate default and custom models
     final defaultModels = [
       'gemini-3.1-flash-lite',
       'gemini-2.5-flash-lite',
@@ -284,6 +284,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final customModels = provider.availableModels.where((m) => !defaultModels.contains(m)).toList();
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Settings'),
         centerTitle: true,
@@ -296,25 +297,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             'AI Provider',
             [
               Card(
+                color: theme.colorScheme.surface,
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                    child: Icon(Icons.auto_awesome, color: Theme.of(context).colorScheme.primary),
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                    child: Icon(Icons.smart_toy_outlined, color: theme.colorScheme.onSurfaceVariant),
                   ),
-                  title: Text(provider.providerName),
+                  title: Text(provider.providerName, style: theme.textTheme.titleMedium),
                   subtitle: const Text('Liya — Cooperative Digital Assistant'),
-                  trailing: Chip(
-                    label: const Text('Active'),
-                    backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                    labelStyle: TextStyle(color: Theme.of(context).colorScheme.primary),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Active',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: _openAiStudio,
-                icon: const Icon(Icons.open_in_new),
+                icon: const Icon(Icons.open_in_new, size: 18),
                 label: const Text('Get API Key from Google AI Studio'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
               ),
             ],
           ),
@@ -323,8 +338,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             context,
             'Models',
             [
-              // Model Selection
               Card(
+                color: theme.colorScheme.surface,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -332,23 +347,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     children: [
                       Row(
                         children: [
-                          Text('Select Model', style: Theme.of(context).textTheme.titleMedium),
+                          Text('Select Model', style: theme.textTheme.titleMedium),
                           const Spacer(),
                           if (settings.hasGeminiKey)
                             FilledButton.tonalIcon(
                               onPressed: _isFetchingModels ? null : _fetchModels,
                               icon: _isFetchingModels
                                   ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                                  : const Icon(Icons.download),
+                                  : const Icon(Icons.download_outlined, size: 18),
                               label: Text(_isFetchingModels ? 'Fetching...' : 'Fetch from API'),
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
                             ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      
-                      // Default Models
-                      Text('Default Models', style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
+                      const SizedBox(height: 16),
+
+                      Text('Default Models', style: theme.textTheme.labelLarge?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       )),
                       const SizedBox(height: 8),
                       Wrap(
@@ -360,26 +377,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             label: Text(model),
                             selected: isSelected,
                             onSelected: (_) => _changeModel(model),
-                            selectedColor: Theme.of(context).colorScheme.primaryContainer,
+                            selectedColor: theme.colorScheme.surfaceContainerHighest,
                             labelStyle: TextStyle(
                               color: isSelected
-                                  ? Theme.of(context).colorScheme.onPrimaryContainer
-                                  : null,
+                                  ? theme.colorScheme.onSurface
+                                  : theme.colorScheme.onSurfaceVariant,
                             ),
+                            backgroundColor: theme.colorScheme.surface,
+                            side: BorderSide(color: theme.colorScheme.outline),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           );
                         }).toList(),
                       ),
-                      
-                      // Custom/Fetched Models
+
                       if (customModels.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         Row(
                           children: [
-                            Text('Fetched / Custom Models', style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              color: Theme.of(context).colorScheme.primary,
+                            Text('Custom / Fetched Models', style: theme.textTheme.labelLarge?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
                             )),
                             const Spacer(),
-                            Text('(${customModels.length})', style: Theme.of(context).textTheme.bodySmall),
+                            Text('(${customModels.length})', style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            )),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -393,13 +414,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               selected: isSelected,
                               onSelected: (_) => _changeModel(model),
                               onDeleted: () => _removeModel(model),
-                              selectedColor: Theme.of(context).colorScheme.primaryContainer,
-                              deleteIcon: const Icon(Icons.close, size: 16),
+                              selectedColor: theme.colorScheme.surfaceContainerHighest,
                               labelStyle: TextStyle(
                                 color: isSelected
-                                    ? Theme.of(context).colorScheme.onPrimaryContainer
-                                    : null,
+                                    ? theme.colorScheme.onSurface
+                                    : theme.colorScheme.onSurfaceVariant,
                               ),
+                              backgroundColor: theme.colorScheme.surface,
+                              side: BorderSide(color: theme.colorScheme.outline),
                             );
                           }).toList(),
                         ),
@@ -408,18 +430,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
               ),
-              
-              // Add Custom Model
+
               const SizedBox(height: 16),
               const Divider(),
               const SizedBox(height: 12),
-              Text('Add Custom Model', style: Theme.of(context).textTheme.titleMedium),
+              Text('Add Custom Model', style: theme.textTheme.titleMedium),
               const SizedBox(height: 8),
               Text(
                 'Enter a custom model ID (e.g., gemini-2.5-flash-preview-05-20)',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
               const SizedBox(height: 12),
               Row(
@@ -430,11 +451,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       decoration: InputDecoration(
                         labelText: 'Model ID',
                         hintText: 'gemini-2.5-flash-preview-05-20',
-                        prefixIcon: const Icon(Icons.add),
-                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.add_outlined, size: 20),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         suffixIcon: _customModelController.text.isNotEmpty
                             ? IconButton(
-                                icon: const Icon(Icons.clear),
+                                icon: const Icon(Icons.clear, size: 20),
                                 onPressed: () => _customModelController.clear(),
                               )
                             : null,
@@ -446,13 +470,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   FilledButton.icon(
                     onPressed: _isAddingModel ? null : _addCustomModel,
                     icon: _isAddingModel
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.add),
+                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.add, size: 18),
                     label: Text(_isAddingModel ? 'Adding...' : 'Add'),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                    ),
                   ),
                 ],
               ),
@@ -464,6 +487,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             'API Key',
             [
               Card(
+                color: theme.colorScheme.surface,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Form(
@@ -473,23 +497,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.vpn_key, color: Theme.of(context).colorScheme.primary),
+                            Icon(Icons.vpn_key_outlined, color: theme.colorScheme.onSurfaceVariant, size: 20),
                             const SizedBox(width: 12),
-                            Text('Gemini API Key', style: Theme.of(context).textTheme.titleMedium),
+                            Text('Gemini API Key', style: theme.textTheme.titleMedium),
                             const Spacer(),
                             if (settings.hasGeminiKey)
-                              Chip(
-                                label: const Text('Configured'),
-                                backgroundColor: Colors.green.withAlpha(26),
-                                labelStyle: const TextStyle(color: Colors.green),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withAlpha(26),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Configured',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.green,
+                                  ),
+                                ),
                               ),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'Your API key is stored securely on your device using platform keystore (Keychain/Keystore).',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -499,22 +533,25 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           decoration: InputDecoration(
                             labelText: 'API Key',
                             hintText: 'Enter your API key (starts with AIza...)',
-                            prefixIcon: const Icon(Icons.key),
+                            prefixIcon: const Icon(Icons.key_outlined, size: 20),
                             suffixIcon: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: Icon(_obscureApiKey ? Icons.visibility_off : Icons.visibility),
+                                  icon: Icon(_obscureApiKey ? Icons.visibility_off_outlined : Icons.visibility_outlined, size: 20),
                                   onPressed: () => setState(() => _obscureApiKey = !_obscureApiKey),
                                 ),
                                 if (_apiKeyController.text.isNotEmpty)
                                   IconButton(
-                                    icon: const Icon(Icons.clear),
+                                    icon: const Icon(Icons.clear, size: 20),
                                     onPressed: () => _apiKeyController.clear(),
                                   ),
                               ],
                             ),
-                            border: const OutlineInputBorder(),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
@@ -532,8 +569,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             Expanded(
                               child: FilledButton.icon(
                                 onPressed: _saveApiKey,
-                                icon: const Icon(Icons.save),
+                                icon: const Icon(Icons.save_outlined, size: 18),
                                 label: const Text('Save Key'),
+                                style: FilledButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                ),
                               ),
                             ),
                             if (settings.hasGeminiKey) ...[
@@ -541,10 +581,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               Expanded(
                                 child: OutlinedButton.icon(
                                   onPressed: _deleteApiKey,
-                                  icon: const Icon(Icons.delete),
+                                  icon: const Icon(Icons.delete_outline, size: 18),
                                   label: const Text('Delete'),
                                   style: OutlinedButton.styleFrom(
-                                    foregroundColor: Theme.of(context).colorScheme.error,
+                                    foregroundColor: theme.colorScheme.error,
+                                    side: BorderSide(color: theme.colorScheme.error),
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
                                   ),
                                 ),
                               ),
@@ -555,13 +597,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         OutlinedButton.icon(
                           onPressed: _isTestingKey ? null : _testApiKey,
                           icon: _isTestingKey
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.science),
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.science_outlined, size: 18),
                           label: Text(_isTestingKey ? 'Testing...' : 'Test API Key'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
                         ),
                       ],
                     ),
@@ -576,17 +617,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             'Chat Features',
             [
               Card(
+                color: theme.colorScheme.surface,
                 child: Column(
                   children: [
                     SwitchListTile(
                       title: const Text('Streaming Responses'),
-                      subtitle: const Text('Show responses word-by-word as they arrive (ChatGPT style)'),
+                      subtitle: const Text('Show responses word-by-word as they arrive'),
                       value: settings.streamingEnabled,
                       onChanged: (value) {
                         ref.read(settingsProvider.notifier).state = settings.copyWith(
                           streamingEnabled: value,
                         );
                       },
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     ),
                     SwitchListTile(
                       title: const Text('Markdown Rendering'),
@@ -597,6 +640,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           markdownEnabled: value,
                         );
                       },
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     ),
                     SwitchListTile(
                       title: const Text('Show Timestamps'),
@@ -607,6 +651,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           showTimestamps: value,
                         );
                       },
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     ),
                   ],
                 ),
@@ -619,6 +664,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             'Appearance',
             [
               Card(
+                color: theme.colorScheme.surface,
                 child: Column(
                   children: [
                     ListTile(
@@ -640,6 +686,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           }
                         },
                       ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     ),
                   ],
                 ),
@@ -652,49 +699,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             'About',
             [
               Card(
+                color: theme.colorScheme.surface,
                 child: Column(
                   children: [
                     ListTile(
-                      leading: const Icon(Icons.description),
+                      leading: Icon(Icons.description_outlined, color: theme.colorScheme.onSurfaceVariant),
                       title: const Text('Privacy'),
                       subtitle: const Text('Your API keys never leave your device'),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     ),
                     ListTile(
-                      leading: const Icon(Icons.security),
+                      leading: Icon(Icons.security_outlined, color: theme.colorScheme.onSurfaceVariant),
                       title: const Text('Security'),
-                      subtitle: const Text('Keys stored in platform secure storage (Keychain/Keystore)'),
+                      subtitle: const Text('Keys stored in platform secure storage'),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     ),
                     ListTile(
-                      leading: const Icon(Icons.code),
-                      title: const Text('Open Source'),
-                      subtitle: const Text('Built with Flutter, Riverpod, and Google Generative AI'),
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.info),
+                      leading: Icon(Icons.code_outlined, color: theme.colorScheme.onSurfaceVariant),
                       title: const Text('Version'),
                       subtitle: Text('$_appVersion ($_buildNumber)'),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                     ),
                   ],
                 ),
               ),
             ],
           ),
+          const SizedBox(height: 40),
         ],
       ),
     );
   }
 
   Widget _buildSection(BuildContext context, String title, List<Widget> children) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          padding: const EdgeInsets.only(left: 4, bottom: 12),
           child: Text(
             title,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            style: theme.textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.primary,
+              color: theme.colorScheme.onSurface,
             ),
           ),
         ),

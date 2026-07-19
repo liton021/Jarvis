@@ -49,41 +49,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     ref.read(chatProvider.notifier).addMessage(AppChatMessage(
           id: _uuid.v4(),
-          text: '👋 Hello! I\'m **Liya**, your cooperative digital assistant. How can I help you today?\n\n'
-              '💡 **Tips:**\n'
-              '• Type naturally - I understand context\n'
-              '• Ask me to write code, explain concepts, or brainstorm\n'
-              '• Streaming responses work like ChatGPT\n\n'
-              'What would you like to talk about?',
+          text: 'How can I help you today?',
           senderId: 'ai',
           timestamp: DateTime.now(),
           isUser: false,
         ));
 
     setState(() => _isInitialized = true);
-  }
-
-  Future<void> _changeModelQuick(String model) async {
-    final settings = ref.read(settingsProvider);
-    if (settings.selectedModel == model) return;
-
-    final provider = AIProviderRegistry.get(settings.selectedProvider);
-    if (provider is GeminiProviderService) {
-      final key = await SecureStorageService.getGeminiApiKey();
-      if (key != null) {
-        await provider.initialize(key, model: model);
-      }
-    }
-
-    ref.read(settingsProvider.notifier).state = settings.copyWith(
-      selectedModel: model,
-    );
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Switched to $model'), duration: const Duration(seconds: 2)),
-      );
-    }
   }
 
   Future<void> _handleSend() async {
@@ -194,8 +166,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     setState(() => _regeneratingMessageIndex = aiMessageIndex);
 
-    final newAiMessageId = _uuid.v4();
-
     ref.read(chatProvider.notifier).updateMessage(
       messages[aiMessageIndex].id,
       '',
@@ -204,7 +174,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     try {
       final history = messages
-          .where((m) => m.id != messages[aiMessageIndex].id && m.id != newAiMessageId)
+          .where((m) => m.id != messages[aiMessageIndex].id)
           .take(userMessageIndex + 1)
           .toList();
 
@@ -241,7 +211,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     await Clipboard.setData(ClipboardData(text: text));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Copied to clipboard'), duration: Duration(seconds: 2)),
+        const SnackBar(content: Text('Copied'), duration: Duration(seconds: 2)),
       );
     }
   }
@@ -305,78 +275,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final chatState = ref.watch(chatProvider);
-    final settings = ref.watch(settingsProvider);
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     if (!_isInitialized) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: Center(
+          child: CircularProgressIndicator(color: theme.colorScheme.primary),
+        ),
+      );
     }
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: theme.colorScheme.primaryContainer,
-              child: Icon(
-                Icons.smart_toy_rounded,
-                size: 18,
-                color: theme.colorScheme.onPrimaryContainer,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Liya', style: TextStyle(fontSize: 16)),
-                Text(
-                  settings.selectedModel,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+        title: const Text('Liya'),
         actions: [
-          // Quick Model Picker
-          PopupMenuButton<String>(
-            tooltip: 'Switch Model',
-            icon: const Icon(Icons.swap_horiz_rounded),
-            onSelected: (model) => _changeModelQuick(model),
-            itemBuilder: (context) {
-              final provider = AIProviderRegistry.get('gemini');
-              if (provider == null) return [];
-              final models = provider.availableModels;
-              return models.map((model) {
-                final isSelected = settings.selectedModel == model;
-                return PopupMenuItem<String>(
-                  value: model,
-                  child: Row(
-                    children: [
-                      if (isSelected)
-                        Icon(Icons.check, size: 18, color: theme.colorScheme.primary)
-                      else
-                        const SizedBox(width: 24),
-                      const SizedBox(width: 8),
-                      Text(model),
-                    ],
-                  ),
-                );
-              }).toList();
-            },
-          ),
           if (chatState.messages.isNotEmpty)
             IconButton(
-              icon: const Icon(Icons.delete_sweep_rounded),
+              icon: const Icon(Icons.delete_sweep_outlined),
               onPressed: _showClearChatDialog,
               tooltip: 'Clear Chat',
             ),
           IconButton(
-            icon: const Icon(Icons.settings_rounded),
+            icon: const Icon(Icons.settings_outlined),
             onPressed: _navigateToSettings,
             tooltip: 'Settings',
           ),
@@ -387,18 +310,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
               itemCount: chatState.messages.length,
               itemBuilder: (context, index) {
                 final message = chatState.messages[index];
                 final isUser = message.isUser;
                 final isRegenerating = _regeneratingMessageIndex == index;
 
-                if (isUser) {
-                  return _buildUserMessage(message, theme, settings);
-                } else {
-                  return _buildAiMessage(message, index, theme, isRegenerating, settings);
-                }
+                return _buildMessage(message, index, theme, isRegenerating);
               },
             ),
           ),
@@ -410,160 +329,147 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  Widget _buildUserMessage(AppChatMessage message, ThemeData theme, SettingsState settings) {
+  Widget _buildMessage(AppChatMessage message, int index, ThemeData theme, bool isRegenerating) {
+    final isUser = message.isUser;
+    final isError = message.metadata?['isError'] == true;
+    final isStreaming = message.isStreaming || isRegenerating;
     final timeStr = DateFormat('HH:mm').format(message.timestamp);
 
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.8,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                borderRadius: BorderRadius.circular(18).copyWith(
-                  bottomRight: const Radius.circular(4),
-                  bottomLeft: const Radius.circular(18),
-                ),
-              ),
-              child: SelectableText(
-                message.text,
-                style: TextStyle(
-                  color: theme.colorScheme.onPrimary,
-                  fontSize: 15,
-                ),
-              ),
-            ),
-            if (settings.showTimestamps)
-              Padding(
-                padding: const EdgeInsets.only(top: 4, right: 8),
-                child: Text(
-                  timeStr,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: theme.colorScheme.onSurfaceVariant,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        children: [
+          if (!isUser) _buildAvatar(theme, isStreaming),
+          if (!isUser) const SizedBox(width: 12),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                if (!isUser)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Liya',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        if (isStreaming) ...[
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                Container(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.85,
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isUser
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(16).copyWith(
+                      bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(16),
+                      bottomLeft: isUser ? const Radius.circular(16) : const Radius.circular(4),
+                    ),
+                    border: isUser
+                        ? null
+                        : Border.all(color: theme.colorScheme.outline),
+                  ),
+                  child: SelectableText(
+                    message.text,
+                    style: TextStyle(
+                      color: isUser
+                          ? theme.colorScheme.onPrimary
+                          : theme.colorScheme.onSurface,
+                      fontSize: 15,
+                      height: 1.5,
+                    ),
                   ),
                 ),
-              ),
-          ],
-        ),
+                if (!isStreaming && !isUser) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildActionButton(
+                        icon: Icons.content_copy_outlined,
+                        tooltip: 'Copy',
+                        onPressed: () => _copyToClipboard(message.text),
+                        theme,
+                      ),
+                      _buildActionButton(
+                        icon: Icons.refresh_outlined,
+                        tooltip: 'Regenerate',
+                        onPressed: () => _regenerateResponse(index),
+                        theme,
+                      ),
+                      _buildActionButton(
+                        icon: Icons.share_outlined,
+                        tooltip: 'Share',
+                        onPressed: () => _shareResponse(message.text),
+                        theme,
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 4),
+                Padding(
+                  padding: EdgeInsets.only(left: isUser ? 0 : 4, right: isUser ? 4 : 0),
+                  child: Text(
+                    timeStr,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: theme.colorScheme.onSurfaceVariant.withAlpha(150),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isUser) const SizedBox(width: 12),
+          if (isUser) _buildUserAvatar(theme),
+        ],
       ),
     );
   }
 
-  Widget _buildAiMessage(
-    AppChatMessage message,
-    int index,
-    ThemeData theme,
-    bool isRegenerating,
-    SettingsState settings,
-  ) {
-    final timeStr = DateFormat('HH:mm').format(message.timestamp);
-    final isError = message.metadata?['isError'] == true;
-    final isStreaming = message.isStreaming || isRegenerating;
+  Widget _buildAvatar(ThemeData theme, bool isStreaming) {
+    return CircleAvatar(
+      radius: 16,
+      backgroundColor: theme.colorScheme.surfaceContainerHighest,
+      child: Icon(
+        Icons.smart_toy_outlined,
+        size: 16,
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      width: double.infinity,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 14,
-                backgroundColor: theme.colorScheme.primaryContainer,
-                child: Icon(
-                  Icons.auto_awesome,
-                  size: 14,
-                  color: theme.colorScheme.onPrimaryContainer,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Liya',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              if (isStreaming) ...[
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 1.5,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ],
-              const Spacer(),
-              if (!isStreaming) ...[
-                _buildActionButton(
-                  icon: Icons.content_copy,
-                  tooltip: 'Copy',
-                  onPressed: () => _copyToClipboard(message.text),
-                ),
-                _buildActionButton(
-                  icon: Icons.refresh,
-                  tooltip: 'Regenerate',
-                  onPressed: () => _regenerateResponse(index),
-                ),
-                _buildActionButton(
-                  icon: Icons.share,
-                  tooltip: 'Share',
-                  onPressed: () => _shareResponse(message.text),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isError
-                  ? theme.colorScheme.errorContainer
-                  : theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isError
-                    ? theme.colorScheme.error
-                    : theme.colorScheme.outlineVariant,
-              ),
-            ),
-            child: MarkdownBody(
-              data: message.text,
-              selectable: true,
-              styleSheet: _buildMarkdownStyleSheet(theme, isError),
-              onTapLink: (text, href, title) {
-                if (href != null) {
-                  launchUrl(Uri.parse(href));
-                }
-              },
-              extensionSet: md.ExtensionSet.gitHubFlavored,
-            ),
-          ),
-          if (settings.showTimestamps)
-            Padding(
-              padding: const EdgeInsets.only(top: 6, left: 4),
-              child: Text(
-                timeStr,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-        ],
+  Widget _buildUserAvatar(ThemeData theme) {
+    return CircleAvatar(
+      radius: 16,
+      backgroundColor: theme.colorScheme.surfaceContainerHighest,
+      child: Icon(
+        Icons.person_outline,
+        size: 16,
+        color: theme.colorScheme.onSurfaceVariant,
       ),
     );
   }
@@ -572,16 +478,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     required IconData icon,
     required String tooltip,
     required VoidCallback onPressed,
+    required ThemeData theme,
   }) {
     return Tooltip(
       message: tooltip,
       child: IconButton(
-        icon: Icon(icon, size: 18),
+        icon: Icon(icon, size: 16),
         onPressed: onPressed,
         padding: EdgeInsets.zero,
         constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
         style: IconButton.styleFrom(
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          foregroundColor: theme.colorScheme.onSurfaceVariant,
         ),
       ),
     );
@@ -589,22 +497,23 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _buildThinkingIndicator(ThemeData theme) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       child: Row(
         children: [
-          SizedBox(
-            width: 14,
-            height: 14,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              color: theme.colorScheme.primary,
+          CircleAvatar(
+            radius: 12,
+            backgroundColor: theme.colorScheme.surfaceContainerHighest,
+            child: Icon(
+              Icons.smart_toy_outlined,
+              size: 12,
+              color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Text(
-            _regeneratingMessageIndex != -1 ? 'Regenerating...' : 'Liya is thinking...',
+            _regeneratingMessageIndex != -1 ? 'Regenerating...' : 'Thinking...',
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 13,
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
@@ -614,12 +523,14 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildInputArea(ThemeData theme, ChatState chatState) {
+    final isLoading = _isLoading || chatState.isLoading;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: theme.scaffoldBackgroundColor,
         border: Border(
-          top: BorderSide(color: theme.colorScheme.outlineVariant),
+          top: BorderSide(color: theme.colorScheme.outline),
         ),
       ),
       child: SafeArea(
@@ -631,78 +542,44 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               child: TextField(
                 controller: _controller,
                 maxLines: null,
+                minLines: 1,
+                maxLength: 4000,
                 textInputAction: TextInputAction.send,
                 onSubmitted: (_) => _handleSend(),
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface,
+                  fontSize: 16,
+                ),
                 decoration: InputDecoration(
                   hintText: 'Message Liya...',
-                  filled: true,
-                  fillColor: theme.colorScheme.surfaceContainer,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(24),
-                    borderSide: BorderSide.none,
+                  hintStyle: TextStyle(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  filled: true,
+                  counterText: '',
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            IconButton.filled(
-              onPressed: (_isLoading || chatState.isLoading) ? null : _handleSend,
-              icon: const Icon(Icons.send_rounded),
-              style: IconButton.styleFrom(
-                padding: const EdgeInsets.all(14),
+            const SizedBox(width: 12),
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary,
+                shape: BoxShape.circle,
+              ),
+              child: IconButton.filled(
+                onPressed: isLoading ? null : _handleSend,
+                icon: const Icon(Icons.send_rounded, size: 20),
+                style: IconButton.styleFrom(
+                  padding: const EdgeInsets.all(14),
+                  foregroundColor: theme.colorScheme.onPrimary,
+                  backgroundColor: theme.colorScheme.primary,
+                  disabledForegroundColor: theme.colorScheme.onPrimary.withAlpha(100),
+                  disabledBackgroundColor: theme.colorScheme.primary.withAlpha(100),
+                ),
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  MarkdownStyleSheet _buildMarkdownStyleSheet(ThemeData theme, bool isError) {
-    final baseColor = isError
-        ? theme.colorScheme.onErrorContainer
-        : theme.colorScheme.onSurface;
-
-    return MarkdownStyleSheet(
-      p: TextStyle(fontSize: 15, color: baseColor, height: 1.6),
-      h1: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: baseColor),
-      h2: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: baseColor),
-      h3: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: baseColor),
-      code: TextStyle(
-        fontSize: 14,
-        fontFamily: 'monospace',
-        color: theme.colorScheme.primary,
-        backgroundColor: theme.colorScheme.surfaceContainer,
-      ),
-      codeblockDecoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      codeblockPadding: const EdgeInsets.all(16),
-      blockquote: TextStyle(
-        fontSize: 15,
-        color: baseColor.withAlpha(180),
-        fontStyle: FontStyle.italic,
-      ),
-      blockquoteDecoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(8),
-        border: Border(
-          left: BorderSide(color: theme.colorScheme.primary, width: 4),
-        ),
-      ),
-      blockquotePadding: const EdgeInsets.all(12),
-      a: TextStyle(
-        color: theme.colorScheme.primary,
-        decoration: TextDecoration.underline,
-      ),
-      listBullet: TextStyle(fontSize: 15, color: baseColor),
-      listIndent: 24,
-      horizontalRuleDecoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: theme.colorScheme.outlineVariant, width: 1),
         ),
       ),
     );
