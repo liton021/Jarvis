@@ -272,16 +272,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final provider = AIProviderRegistry.get('gemini')!;
     final theme = Theme.of(context);
 
-    final defaultModels = [
-      'gemini-3.1-flash-lite',
-      'gemini-2.5-flash-lite',
-      'gemini-2.5-flash',
-      'gemini-2.5-pro',
-      'gemini-2.0-flash-exp',
-      'gemini-1.5-flash',
-      'gemini-1.5-pro',
-    ];
-    final customModels = provider.availableModels.where((m) => !defaultModels.contains(m)).toList();
+    final allModels = provider.availableModels;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -371,7 +362,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
-                        children: defaultModels.map((model) {
+                        children: allModels.map((model) {
                           final isSelected = settings.selectedModel == model;
                           return ChoiceChip(
                             label: Text(model),
@@ -389,43 +380,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           );
                         }).toList(),
                       ),
-
-                      if (customModels.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Text('Custom / Fetched Models', style: theme.textTheme.labelLarge?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            )),
-                            const Spacer(),
-                            Text('(${customModels.length})', style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            )),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: customModels.map((model) {
-                            final isSelected = settings.selectedModel == model;
-                            return InputChip(
-                              label: Text(model),
-                              selected: isSelected,
-                              onSelected: (_) => _changeModel(model),
-                              onDeleted: () => _removeModel(model),
-                              selectedColor: theme.colorScheme.surfaceContainerHighest,
-                              labelStyle: TextStyle(
-                                color: isSelected
-                                    ? theme.colorScheme.onSurface
-                                    : theme.colorScheme.onSurfaceVariant,
-                              ),
-                              backgroundColor: theme.colorScheme.surface,
-                              side: BorderSide(color: theme.colorScheme.outline),
-                            );
-                          }).toList(),
-                        ),
-                      ],
                     ],
                   ),
                 ),

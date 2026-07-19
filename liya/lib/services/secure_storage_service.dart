@@ -21,14 +21,6 @@ class SecureStorageService {
   static const String _showTimestamps = 'show_timestamps';
   static const String _customGeminiModels = 'custom_gemini_models';
 
-  static const List<String> _defaultModels = [
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
-    'gemini-2.0-flash-exp',
-    'gemini-2.5-flash',
-    'gemini-2.5-pro',
-  ];
-
   static Future<void> saveGeminiApiKey(String apiKey) async {
     await _storage.write(key: _geminiApiKey, value: apiKey);
   }
@@ -103,17 +95,16 @@ class SecureStorageService {
 
   static Future<List<String>> getCustomGeminiModels() async {
     final json = await _storage.read(key: _customGeminiModels);
-    if (json == null || json.isEmpty) return _defaultModels;
+    if (json == null || json.isEmpty) return [];
     try {
       final List<dynamic> decoded = jsonDecode(json);
-      return [..._defaultModels, ...decoded.cast<String>().where((m) => !_defaultModels.contains(m))];
+      return decoded.cast<String>();
     } catch (_) {
-      return _defaultModels;
+      return [];
     }
   }
 
   static Future<void> saveCustomGeminiModels(List<String> models) async {
-    final customModels = models.where((m) => !_defaultModels.contains(m)).toList();
-    await _storage.write(key: _customGeminiModels, value: jsonEncode(customModels));
+    await _storage.write(key: _customGeminiModels, value: jsonEncode(models));
   }
 }

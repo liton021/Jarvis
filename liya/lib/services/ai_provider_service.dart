@@ -30,15 +30,7 @@ class GeminiProviderService implements AIProviderService {
   @override
   final String providerName = 'Google Gemini';
 
-  List<String> _availableModels = [
-    'gemini-3.1-flash-lite',
-    'gemini-2.5-flash-lite',
-    'gemini-2.5-flash',
-    'gemini-2.5-pro',
-    'gemini-2.0-flash-exp',
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
-  ];
+  List<String> _availableModels = [];
 
   @override
   List<String> get availableModels => _availableModels;
@@ -63,7 +55,7 @@ class GeminiProviderService implements AIProviderService {
   @override
   Future<void> initialize(String apiKey, {String? model}) async {
     // Load custom models on first initialization
-    if (_availableModels.length <= 5) { // Only defaults
+    if (_availableModels.isEmpty) {
       final customModels = await SecureStorageService.getCustomGeminiModels();
       _availableModels = customModels;
     }
