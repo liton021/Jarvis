@@ -32,23 +32,23 @@ jobs:
           cache: true
 
       - name: Get dependencies
-        working-directory: ./flutter_chat_app
+        working-directory: ./liya
         run: flutter pub get
 
       - name: Generate code
-        working-directory: ./flutter_chat_app
+        working-directory: ./liya
         run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Build APKs (split per ABI)
-        working-directory: ./flutter_chat_app
+        working-directory: ./liya
         run: flutter build apk --release --split-per-abi
 
       - name: Build Universal APK
-        working-directory: ./flutter_chat_app
+        working-directory: ./liya
         run: flutter build apk --release
 
       - name: Build App Bundle
-        working-directory: ./flutter_chat_app
+        working-directory: ./liya
         run: flutter build appbundle --release
 
       - name: Upload APK artifacts
@@ -56,8 +56,8 @@ jobs:
         with:
           name: android-apks
           path: |
-            flutter_chat_app/build/app/outputs/flutter-apk/*.apk
-            flutter_chat_app/build/app/outputs/bundle/release/*.aab
+            liya/build/app/outputs/flutter-apk/*.apk
+            liya/build/app/outputs/bundle/release/*.aab
           retention-days: 30
 
       - name: Create Release
@@ -65,8 +65,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
-            flutter_chat_app/build/app/outputs/flutter-apk/*.apk
-            flutter_chat_app/build/app/outputs/bundle/release/*.aab
+            liya/build/app/outputs/flutter-apk/*.apk
+            liya/build/app/outputs/bundle/release/*.aab
           generate_release_notes: true
           draft: false
           prerelease: false
@@ -88,22 +88,22 @@ jobs:
           cache: true
 
       - name: Get dependencies
-        working-directory: ./flutter_chat_app
+        working-directory: ./liya
         run: flutter pub get
 
       - name: Generate code
-        working-directory: ./flutter_chat_app
+        working-directory: ./liya
         run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Build Web
-        working-directory: ./flutter_chat_app
+        working-directory: ./liya
         run: flutter build web --release
 
       - name: Upload Web artifacts
         uses: actions/upload-artifact@v4
         with:
           name: web-build
-          path: flutter_chat_app/build/web/
+          path: liya/build/web/
           retention-days: 30
 
       - name: Deploy to GitHub Pages
@@ -111,5 +111,5 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./flutter_chat_app/build/web
+          publish_dir: ./liya/build/web
           force_orphan: true

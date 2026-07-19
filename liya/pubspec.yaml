@@ -1,0 +1,48 @@
+name: liya
+description: Liya - Cooperative Digital Assistant with BYOK (Bring Your Own Key) support for AI providers, starting with Gemini.
+publish_to: 'none'
+version: 1.0.5+1
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # AI Chat UI - ChatGPT-like interface with streaming, markdown, code blocks
+  flutter_gen_ai_chat_ui: ^2.3.2
+
+  # Google Generative AI SDK for Dart/Flutter
+  google_generative_ai: ^0.4.7
+
+  # Secure Storage for API Keys
+  flutter_secure_storage: ^9.2.2
+
+  # Utilities
+  freezed_annotation: ^2.4.4
+  json_annotation: ^4.9.0
+  uuid: ^4.4.2
+  intl: ^0.19.0
+  url_launcher: ^6.3.0
+  package_info_plus: ^8.0.2
+  flutter_markdown: ^0.7.4
+  share_plus: ^10.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  riverpod_generator: ^2.4.0
+  freezed: ^2.5.2
+  build_runner: ^2.4.9
+  json_serializable: ^6.8.0
+
+flutter:
+  uses-material-design: true
